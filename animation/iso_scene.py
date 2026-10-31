@@ -4,6 +4,11 @@ from types import SimpleNamespace as NS
 
 import numpy as np
 
+import os
+import re
+
+from PIL import Image
+
 from wc import (Canvas, ellipse, rrect, spline, xf, clip_halfplane, INK)
 import iso_bg as iso
 
@@ -34,16 +39,18 @@ def shot_for(i):
 
 
 # ---------------------------------------------------------------- palette
-SKIN_W, SKIN_W2 = (0.98, 0.80, 0.68), (0.96, 0.72, 0.62)
-SKIN_M, SKIN_M2 = (0.90, 0.67, 0.53), (0.86, 0.60, 0.48)
-HAIR_W, HAIR_W2 = (0.56, 0.22, 0.12), (0.42, 0.16, 0.10)
-HAIR_M, HAIR_M2 = (0.27, 0.17, 0.12), (0.22, 0.14, 0.13)
-DRESS, DRESS2 = (0.16, 0.50, 0.44), (0.12, 0.38, 0.47)
-NAVY, NAVY2 = (0.20, 0.26, 0.45), (0.25, 0.28, 0.52)
-SHIRT = (0.90, 0.92, 0.96)
-WINE, WINE2 = (0.48, 0.05, 0.14), (0.62, 0.10, 0.20)
-GOLD = (0.88, 0.68, 0.30)
-BLUSH = (0.95, 0.48, 0.48)
+SKIN_W, SKIN_W2 = (0.99, 0.84, 0.74), (0.95, 0.70, 0.62)
+SKIN_M, SKIN_M2 = (0.96, 0.78, 0.66), (0.90, 0.64, 0.54)
+HAIR_W, HAIR_W2 = (0.52, 0.30, 0.16), (0.44, 0.24, 0.13)
+HAIR_M, HAIR_M2 = (0.36, 0.21, 0.12), (0.30, 0.17, 0.10)
+HAIR_W_HL, HAIR_M_HL = (0.76, 0.52, 0.30), (0.58, 0.38, 0.22)
+DRESS, DRESS2 = (0.66, 0.60, 0.96), (0.56, 0.48, 0.92)       # brand lavender
+NAVY, NAVY2 = (0.27, 0.20, 0.60), (0.22, 0.17, 0.50)         # brand indigo, deepened
+SHIRT = (0.97, 0.96, 1.0)
+WINE, WINE2 = (0.50, 0.06, 0.16), (0.64, 0.10, 0.22)
+GOLD = (0.95, 0.72, 0.30)
+BLUSH = (0.98, 0.52, 0.52)
+SOFTLINE = ((0.42, 0.22, 0.17), 0.55, 0.7)
 WARM = (1.0, 0.78, 0.45)
 
 
@@ -87,7 +94,7 @@ def pose_w(t):
     p.happy = key(t, [(0, 1), (1.4, 1), (1.5, 0), (2.8, 0), (2.9, 1), (3.35, 1), (3.42, 0), (11.4, 0), (11.55, 1),
                       (12.2, 1), (12.3, 0), (13.05, 0), (13.15, 1), (15, 1)])
     p.open = key(t, [(0, 1), (3.38, 1), (3.5, 1.28), (4.0, 1.12), (10.67, 1.08), (11.0, 1.0), (15, 1.0)])
-    for bt in (2.1, 4.95, 6.95, 11.05):
+    for bt in (2.1, 5.3, 6.95, 11.05):
         if bt <= t < bt + 0.09:
             p.open = 0.05
     p.look = key(t, [(0, (1, 0)), (3.35, (1, 0)), (3.45, (0.8, 1)), (4.25, (0.8, 1)), (4.3, (1, 0)), (5.75, (1, 0)),
@@ -191,15 +198,17 @@ class Char:
 WOMAN = Char("w", 1, (275, 975), SKIN_W, SKIN_W2, HAIR_W, HAIR_W2, True)
 MAN = Char("m", -1, (805, 968), SKIN_M, SKIN_M2, HAIR_M, HAIR_M2, False)
 
-HEAD = [(0, -125), (60, -113), (98, -62), (106, 0), (97, 56), (66, 101), (24, 124), (-20, 121), (-68, 99), (-98, 50),
-        (-104, -12), (-91, -76), (-54, -114)]
-EAR = [(-92, -18), (-118, -24), (-127, 6), (-116, 36), (-94, 34)]
+HEAD = [(0, -122), (64, -112), (102, -64), (112, 0), (106, 52), (80, 96), (38, 120), (-6, 124), (-52, 112),
+        (-90, 80), (-108, 30), (-110, -30), (-90, -84), (-50, -114)]
+EAR = [(-98, -6), (-124, -14), (-132, 14), (-120, 42), (-98, 40)]
 W_BACKHAIR = [(-10, -146), (70, -132), (118, -72), (128, 10), (116, 96), (124, 180), (96, 236), (52, 214), (10, 250),
               (-60, 268), (-132, 286), (-172, 214), (-160, 108), (-150, -10), (-128, -96), (-76, -138)]
-W_FRONTHAIR = [(-108, 22), (-118, -52), (-90, -116), (-20, -146), (54, -136), (104, -92), (118, -30), (112, 18),
-               (98, -26), (76, -60), (40, -66), (8, -82), (-26, -58), (-58, -42), (-86, -6)]
-M_HAIR = [(-108, 6), (-114, -58), (-86, -114), (-30, -146), (36, -154), (92, -128), (112, -80), (104, -46),
-          (74, -70), (36, -80), (-6, -74), (-46, -60), (-72, -34), (-82, 4), (-88, 34), (-100, 30)]
+W_FRONTHAIR = [(-110, 30), (-122, -40), (-104, -100), (-62, -136), (-6, -150), (52, -142), (98, -110), (122, -60),
+               (128, -6), (112, 30), (104, -16), (96, -46), (78, -66), (60, -54), (44, -82), (22, -64), (2, -88),
+               (-22, -70), (-48, -84), (-66, -52), (-86, -40), (-92, 0)]
+M_HAIR = [(-108, 16), (-120, -40), (-108, -94), (-72, -132), (-22, -152), (32, -152), (80, -132), (110, -96),
+          (124, -52), (108, -30), (100, -50), (84, -36), (74, -64), (56, -44), (42, -74), (20, -54), (2, -80),
+          (-20, -58), (-40, -82), (-60, -56), (-80, -66), (-88, -30), (-94, 6)]
 M_BEARD = [(-98, 24), (-92, 70), (-62, 108), (-14, 132), (30, 130), (72, 106), (100, 58), (106, 18), (92, 40),
            (66, 70), (46, 98), (26, 106), (6, 104), (-18, 94), (-44, 64), (-74, 40)]
 
@@ -231,8 +240,6 @@ def draw_torso(cv, ch, p, F, k):
         cv.fill(dress, DRESS, dens=0.82, color2=DRESS2, key=k + "dr", anchor=F.neck)
         cv.wash(T(spline([(60, 140), (120, 160), (140, 300), (130, 430), (70, 430), (90, 300)], True)), DRESS2,
                 dens=0.35, knock=False, key=k + "drs", anchor=F.neck, soft=8)
-        cv.hatch(dress, angle=60, spacing=4.5, alpha=0.45, key=k + "drh", fade=((-ch.dir, 0.4), 0.45, 1.0))
-        cv.hatch(skin, angle=60, spacing=5, alpha=0.25, key=k + "skh", fade=((-ch.dir, 0.2), 0.75, 1.0))
         cv.ink([(dress, True)], 3.4, key=k + "dr")
         straps = [T(spline([(-96, 22), (-98, 60), (-104, 96)])), T(spline([(96, 22), (98, 60), (104, 96)]))]
         cv.ink([(s, False, 9) for s in straps], color=(0.12, 0.38, 0.36), alpha=0.95, key=k + "st")
@@ -259,8 +266,6 @@ def draw_torso(cv, ch, p, F, k):
                     (sgn * 2, 200), (sgn * 36, 100), (sgn * 60, 34)]
             poly = T(spline(half, True, 6))
             cv.fill(poly, NAVY, dens=0.88, color2=NAVY2, key=k + f"bz{sgn}", anchor=F.neck)
-            if sgn == -ch.dir:
-                cv.hatch(poly, angle=60, spacing=4.5, alpha=0.4, key=k + f"bzh{sgn}", fade=((-ch.dir, 0.4), 0.2, 1.0))
             cv.ink([(poly, True)], 3.4, key=k + f"bz{sgn}")
             cv.ink([(T(spline([(sgn * 54, 10), (sgn * 82, 74), (sgn * 64, 88), (sgn * 12, 196)])), False, 2.6)],
                    key=k + f"lp{sgn}")
@@ -269,116 +274,137 @@ def draw_torso(cv, ch, p, F, k):
         cv.ink([(T([(-126, 152), (-84, 152)]), False, 2.4)], key=k + "pk")
 
 
-def eye(cv, ch, p, T, ex, ey, sx, k):
+def _eye_open(cv, ch, p, T, ex, ey, sx, k, a):
     lx, ly = p.look
-    if p.happy > 0.5:
-        cv.ink([(T(spline([(ex - 15 * sx, ey + 5), (ex, ey - 9), (ex + 15 * sx, ey + 5)])), False, 5.0)], key=k)
-        return
     o = p.open
-    if o < 0.2:
-        cv.ink([(T(spline([(ex - 15 * sx, ey + 1), (ex, ey + 6), (ex + 15 * sx, ey + 1)])), False, 4.2)], key=k)
-        return
-    rx, ry = 15.5 * sx * (0.9 + 0.1 * o), 19 * o
+    rx, ry = 22.0 * sx, 26.0 * o
     white = T(ellipse(ex, ey, rx, ry, n=30))
-    cv.paint(white, (0.99, 0.98, 0.95))
-    px, py = ex + lx * 5 * sx, ey + ly * 6 * min(o, 1)
-    pr = 9.5 if o <= 1.05 else 9.5 - (o - 1) * 10
-    pup = T(ellipse(px, py, pr * sx, min(12.5, ry - 2) * (1 if o <= 1.05 else 0.85), n=24))
-    cv.paint(pup, (0.17, 0.11, 0.10))
-    cv.paint(T(ellipse(px - 3 * sx, py - 5, 3.2, 3.2, n=12)), (1, 1, 1))
-    up = T(ellipse(ex, ey, rx, ry, n=20, a0=math.pi * 1.05, a1=math.pi * 1.95))
-    lo = T(ellipse(ex, ey, rx, ry, n=16, a0=math.pi * 0.15, a1=math.pi * 0.85))
-    strokes = [(up, False, 4.6), (lo, False, 2.0)]
-    if ch.female:
-        side = 1 if ex > p.fx else -1
-        ox = ex + side * rx * 0.85
-        strokes.append((T([(ox, ey - ry * 0.55), (ox + side * 9, ey - ry * 0.9)]), False, 2.6))
-        strokes.append((T([(ox - side * 4, ey - ry * 0.8), (ox + side * 3, ey - ry * 1.2)]), False, 2.2))
-    cv.ink(strokes, key=k)
+    cv.paint(white, (0.99, 0.98, 0.97), light=True)
+    ix, iy = ex + lx * 3.5 * sx, ey + ly * 4.0 * min(o, 1) + 1
+    ir = 18.0 if o <= 1.05 else 18.0 - (o - 1) * 16
+    iris = T(ellipse(ix, iy, ir * sx, min(ir * 1.12, ry), n=26))
+    cv.gouache(iris, (0.60, 0.36, 0.18), key=k + "ir", shade_dir=(0, -1), shade=0.62, tex=0.0, jit=0,
+               light=False, edge_dark=0.35, clip=[white], soft=0.5)
+    pup = T(ellipse(ix, iy + 1, 8.5 * sx, 9.5, n=18))
+    cv.gouache(pup, (0.08, 0.05, 0.04), key=k + "pp", tex=0, jit=0, light=False, clip=[white], shade=0)
+    cv.paint(T(ellipse(ix - 6 * sx, iy - 8, 6.2, 6.6, n=14)), (1, 1, 1), 0.95)
+    cv.paint(T(ellipse(ix + 5 * sx, iy + 6, 2.4, 2.4, n=10)), (1, 1, 1), 0.85)
+    up = T(ellipse(ex, ey, rx * 1.04, ry * 1.04, n=22, a0=math.pi * 1.02, a1=math.pi * 1.98))
+    side = 1 if ex > p.fx else -1
+    ox = ex + side * rx * 0.95
+    strokes = [(up, False, 5.2)]
+    nl = 3 if ch.female else 1
+    for j in range(nl):
+        yy = ey - ry * (0.15 + 0.3 * j)
+        strokes.append((T([(ox - side * 2, yy), (ox + side * (9 - 2 * j), yy - 6 - 2 * j)]), False, 2.6))
+    cv.ink(strokes, key=k + "lid", color=(0.16, 0.09, 0.07), alpha=0.95, sketch=False)
+    lo = T(ellipse(ex, ey, rx, ry, n=14, a0=math.pi * 0.2, a1=math.pi * 0.8))
+    cv.ink([(lo, False, 1.6)], key=k + "lo", color=(0.55, 0.32, 0.26), alpha=0.6, sketch=False)
+
+
+def eye(cv, ch, p, T, ex, ey, sx, k, a=(0, 0)):
+    side = 1 if ex > p.fx else -1
+    lid = (0.18, 0.10, 0.08)
+    if p.happy > 0.5:            # smiling closed eyes
+        arc = T(spline([(ex - 20 * sx, ey + 6), (ex, ey - 9), (ex + 20 * sx, ey + 6)]))
+        cv.ink([(arc, False, 5.0)], key=k, color=lid, alpha=0.95, sketch=False)
+        return
+    if p.open < 0.2:             # closed / blinking, lashes down like the sleeping baby
+        arc = spline([(ex - 20 * sx, ey + 2), (ex, ey + 10), (ex + 20 * sx, ey + 2)])
+        lashes = [(T([(ex + side * 13 * sx, ey + 5), (ex + side * 18 * sx, ey + 11)]), False, 2.4),
+                  (T([(ex + side * 5 * sx, ey + 8), (ex + side * 8 * sx, ey + 15)]), False, 2.2)]
+        cv.ink([(T(arc), False, 4.6)] + (lashes if ch.female else []), key=k, color=lid, alpha=0.95, sketch=False)
+        return
+    _eye_open(cv, ch, p, T, ex, ey, sx, k, a)
 
 
 def mouth(cv, ch, p, T, k, anchor):
-    cx, cy = p.fx + 4, 74
-    w, s, o = p.mw, p.smile, p.mopen
-    L, R = (cx - w / 2, cy - s * 9), (cx + w / 2, cy - s * 9)
+    cx, cy = p.fx + 6, 76
+    w, s, o = p.mw * 0.72, p.smile, p.mopen
+    L, R = (cx - w / 2, cy - s * 7), (cx + w / 2, cy - s * 7)
+    lc = (0.55, 0.22, 0.20)
     if o > 0.07:
-        up = spline([L, (cx, cy + s * 3 - o * 3), R], n=10)
-        lo = spline([R, (cx + w * 0.2, cy + s * 3 + 6 + o * 30), (cx - w * 0.2, cy + s * 3 + 6 + o * 30), L], n=8)
+        up = spline([L, (cx, cy + s * 2 - o * 2), R], n=10)
+        lo = spline([R, (cx + w * 0.22, cy + s * 2 + 5 + o * 26), (cx - w * 0.22, cy + s * 2 + 5 + o * 26), L], n=8)
         poly = T(np.vstack([up, lo]))
-        cv.fill(poly, (0.40, 0.08, 0.11), dens=0.95, key=k + "m", soft=1.5, anchor=anchor, shift=(0, 0))
-        tongue = T(ellipse(cx, cy + s * 3 + 4 + o * 30, w * 0.26, 4 + o * 8))
-        cv.wash(tongue, (0.92, 0.45, 0.45), dens=0.8, knock=False, key=k + "t", soft=1.5, anchor=anchor,
-                clip=[poly], shift=(0, 0))
-        cv.ink([(poly, True, 3.4)], key=k + "m")
+        cv.gouache(poly, (0.52, 0.14, 0.17), key=k + "m", shade_dir=(0, -1), shade=0.4, tex=0, jit=0.3,
+                   anchor=anchor)
+        tongue = T(ellipse(cx, cy + s * 2 + 4 + o * 26, w * 0.3, 4 + o * 8))
+        cv.gouache(tongue, (0.97, 0.55, 0.55), key=k + "t", tex=0, jit=0, clip=[poly], anchor=anchor, shade=0.1)
+        cv.ink([(poly, True, 2.6)], key=k + "m", color=lc, alpha=0.8, sketch=False)
     else:
         if p.mwob > 0.5:
-            pts = [L, (cx - w / 4, cy - 3), (cx, cy + 2), (cx + w / 4, cy - 3), R]
+            pts = [L, (cx - w / 4, cy - 2), (cx, cy + 2), (cx + w / 4, cy - 2), R]
             pts = [(x, y + 3) for x, y in pts]
         else:
-            pts = [L, (cx, cy + s * 4), R]
-        strokes = [(T(spline(pts, n=10)), False, 4.0)]
-        if s > 0.6:
-            strokes.append((T([(L[0] - 3, L[1] - 3), (L[0] + 2, L[1] + 4)]), False, 2.4))
-            strokes.append((T([(R[0] + 3, R[1] - 3), (R[0] - 2, R[1] + 4)]), False, 2.4))
-        cv.ink(strokes, key=k + "m")
+            pts = [L, (cx, cy + s * 5), R]
+        cv.ink([(T(spline(pts, n=10)), False, 3.2)], key=k + "m", color=lc, alpha=0.85, sketch=False)
 
 
 def draw_head(cv, ch, p, F, k):
     T = lambda pts: xf(pts, F.hc, F.hr, 1, ch.dir)
     a = F.hc
-    ear = T(spline(EAR, False))
-    cv.fill(ear, ch.skin, dens=0.6, color2=ch.skin2, key=k + "ear", anchor=a)
-    cv.ink([(ear, False, 3.2), (T(spline([(-104, -4), (-114, 8), (-104, 20)])), False, 2.2)], key=k + "ear")
-    if ch.female:
-        ring = T(ellipse(-110, 50, 7, 9))
-        cv.fill(ring, GOLD, dens=0.9, soft=1.5, key=k + "ring", anchor=a)
-        cv.ink([(ring, True, 1.8)], key=k + "ring")
-    head = T(spline(HEAD, True))
-    cv.fill(head, ch.skin, dens=0.55, color2=ch.skin2, key=k + "hd", anchor=a)
-    cv.wash(T(spline([(-104, -10), (-96, 50), (-66, 98), (-40, 70), (-70, 20)], True)), (0.85, 0.62, 0.58), dens=0.2,
-            knock=False, key=k + "hsh", anchor=a, soft=9, clip=[head], hard=1.5)
-    cv.hatch(head, angle=70, spacing=4.5, alpha=0.22, key=k + "hdh", fade=((-ch.dir, 0.3), 0.72, 1.0))
-    if p.blush > 0.02:
-        for bx in (p.fx - 40, p.fx + 46):
-            cv.wash(T(ellipse(bx, 34, 22, 12)), BLUSH, dens=0.5 * p.blush, knock=False, key=k + f"bl{bx}", soft=6,
-                    anchor=a, edge=0.2)
-    cv.ink([(head, True)], 3.8, key=k + "hd")
     fx = p.fx
-    eye(cv, ch, p, T, fx - 36, -4, 1.0, k + "e1")
-    eye(cv, ch, p, T, fx + 41, -4, 0.82, k + "e2")
-    brows = []
-    for ex, so in ((fx - 36, -1), (fx + 41, 1)):
-        by = -38 - p.raise_ * 9
-        outer = (ex + so * 17, by + 3 + p.worry * 4)
-        mid = (ex, by - 3 - p.worry * 2)
-        inner = (ex - so * 15, by + 1 - p.worry * 13)
-        brows.append((T(spline([outer, mid, inner], n=6)), False, 6.0 if not ch.female else 4.6))
-    cv.ink(brows, key=k + "br", color=(0.22, 0.12, 0.10))
-    cv.ink([(T(spline([(fx + 10, 8), (fx + 23, 34), (fx + 11, 43)])), False, 3.2)], key=k + "ns")
-    mouth(cv, ch, p, T, k, a)
-    # hair
+    hl = HAIR_W_HL if ch.female else HAIR_M_HL
+    ear = T(spline(EAR, True))
+    cv.fill(ear, ch.skin, color2=ch.skin2, key=k + "ear", anchor=a)
+    cv.wash(T(ellipse(-116, 14, 9, 16)), (0.92, 0.55, 0.52), dens=0.5, soft=3, key=k + "earin", anchor=a)
+    cv.ink([(ear, False, 3.0)], key=k + "ear")
     if ch.female:
-        fh = T(spline(W_FRONTHAIR, True))
-        cv.fill(fh, ch.hair, dens=0.85, color2=ch.hair2, key=k + "fh", anchor=a)
-        cv.hatch(fh, angle=-30 * ch.dir, spacing=4, alpha=0.3, key=k + "fhh", fade=((-ch.dir, -0.6), 0.3, 1.0))
-        cv.ink([(fh, True)], 3.6, key=k + "fh")
-        cv.ink([(T(spline([(-70, -110), (-30, -122), (20, -118)])), False, 2.0),
-                (T(spline([(40, -110), (80, -82), (100, -40)])), False, 2.0),
-                (T(spline([(-96, -60), (-90, -20), (-80, 4)])), False, 2.0)], key=k + "fhs", alpha=0.6)
-    else:
-        hh = T(spline(M_HAIR, True))
-        cv.fill(hh, ch.hair, dens=0.9, color2=ch.hair2, key=k + "hh", anchor=a)
-        cv.hatch(hh, angle=-30 * ch.dir, spacing=4, alpha=0.35, key=k + "hhh", fade=((-ch.dir, -0.6), 0.2, 1.0))
-        cv.ink([(hh, True)], 3.6, key=k + "hh")
-        cv.ink([(T(spline([(-40, -128), (10, -138), (60, -126)])), False, 2.0),
-                (T(spline([(-74, -96), (-40, -100), (0, -96)])), False, 2.0)], key=k + "hhs", alpha=0.6)
+        ring = T(ellipse(-114, 54, 6, 6))
+        cv.gouache(ring, GOLD, key=k + "ring", anchor=a, tex=0)
+    head = T(spline(HEAD, True))
+    cv.fill(head, ch.skin, color2=ch.skin2, key=k + "hd", anchor=a)
+    # soft volume: shade on the back of the head, glow on the brow and cheek
+    cv.wash(T(spline([(-108, -30), (-100, 50), (-60, 104), (-30, 60), (-60, 0), (-70, -60)], True)), ch.skin2,
+            dens=0.35, key=k + "hsh", anchor=a, soft=14, clip=[head], hard=1.0)
+    cv.paint(T(ellipse(fx + 6, -46, 58, 34)), (1.0, 0.94, 0.88), 0.35, soft=16)
+    cv.paint(T(ellipse(fx + 54, 30, 22, 16)), (1.0, 0.95, 0.90), 0.3, soft=10)
+    blush = 0.35 + 0.4 * p.blush
+    for bx, by in ((fx - 50, 44), (fx + 56, 42)):
+        cv.wash(T(ellipse(bx, by, 26, 17)), BLUSH, dens=0.55 * blush, key=k + f"bl{bx}", soft=9, anchor=a,
+                hard=1.1, edge=0.1, clip=[head])
+    cv.ink([(head, True)], 3.2, key=k + "hd")
+    eye(cv, ch, p, T, fx - 44, 14, 1.0, k + "e1", a)
+    eye(cv, ch, p, T, fx + 44, 14, 0.84, k + "e2", a)
+    brows = []
+    for ex, so in ((fx - 44, -1), (fx + 44, 1)):
+        by = -24 - p.raise_ * 8
+        outer = (ex + so * 18, by + 4 + p.worry * 4)
+        mid = (ex, by - 3 - p.worry * 2)
+        inner = (ex - so * 14, by + 2 - p.worry * 11)
+        brows.append((T(spline([outer, mid, inner], n=6)), False, 4.4 if not ch.female else 3.4))
+    cv.ink(brows, key=k + "br", color=tuple(np.array(ch.hair) * 0.75), alpha=0.95, sketch=False)
+    # button nose
+    nose = T(ellipse(fx + 10, 50, 11, 8))
+    cv.wash(nose, (0.90, 0.58, 0.50), dens=0.35, soft=4, key=k + "ns", anchor=a, hard=1.2)
+    cv.paint(T(ellipse(fx + 7, 46, 3.5, 2.5)), (1, 0.97, 0.94), 0.8, soft=1)
+    cv.ink([(T(spline([(fx + 2, 56), (fx + 10, 59), (fx + 19, 55)])), False, 2.0)], key=k + "nsl")
+    mouth(cv, ch, p, T, k, a)
+    # hair: soft volume, lighter sheen, a few strands and tufts
+    hp = W_FRONTHAIR if ch.female else M_HAIR
+    fr = [(x, y + 14) for x, y in hp[len(hp) // 2:]]
+    cv.wash(T(spline(fr, False, 4)), ch.skin2, dens=0.45, soft=6, key=k + "frsh", anchor=a, hard=1.2, clip=[head],
+            shift=(0, 0))
+    hh = T(spline(hp, True, 5))
+    cv.fill(hh, ch.hair, color2=ch.hair2, key=k + "fh", anchor=a)
+    cv.paint(T(spline([(-70, -112), (-20, -134), (40, -128), (80, -100), (40, -110), (-20, -118)], True)), hl, 0.55,
+             soft=6)
+    tufts = [(T(spline([(-6, -146), (-14, -170), (6, -162)])), False, 3.0),
+             (T(spline([(14, -148), (18, -174), (30, -160)])), False, 2.6)]
+    strands = [(T(spline([(-80, -96), (-40, -116), (0, -120)])), False, 1.8),
+               (T(spline([(20, -126), (66, -110), (100, -74)])), False, 1.8),
+               (T(spline([(-96, -50), (-88, -20), (-80, 6)])), False, 1.6),
+               (T(spline([(40, -100), (60, -80), (72, -62)])), False, 1.6)]
+    cv.ink([(hh, True, 3.0)] + tufts, key=k + "fh", color=tuple(np.array(ch.hair2) * 0.6), alpha=0.8)
+    cv.ink(strands, key=k + "fhs", color=tuple(np.array(ch.hair2) * 0.6), alpha=0.55, sketch=False)
     if p.sweat is not None and 0 <= p.sweat <= 1.6:
         s = min(p.sweat, 1.0)
-        dx, dy = (fx + 84, -70 + s * 50)
+        dx, dy = (fx + 88, -60 + s * 50)
         drop = T(spline([(dx, dy - 22), (dx + 9, dy - 2), (dx + 6, dy + 8), (dx - 6, dy + 8), (dx - 9, dy - 2)], True))
-        cv.paint(drop, (0.97, 0.98, 1.0))
-        cv.wash(drop, (0.55, 0.75, 0.95), dens=0.6, knock=False, key=k + "sw", soft=1.5, anchor=a)
-        cv.ink([(drop, True, 2.6)], key=k + "sw")
+        cv.paint(drop, (0.80, 0.90, 1.0))
+        cv.paint(T(ellipse(dx - 2, dy - 2, 2.5, 4)), (1, 1, 1), 0.9)
+        cv.ink([(drop, True, 2.2)], key=k + "sw", color=(0.3, 0.45, 0.7), alpha=0.8, sketch=False)
 
 
 def ik(S, Hn, pref, Lmax=205):
@@ -618,6 +644,7 @@ def draw_restaurant(cv, t, i, cam):
         iso.chair_iso(cv, x, y, f"ch{x}", facing=f, col=(0.36, 0.21, 0.13))
     cv.shadow(iso.circ3(TABLE[0] + 14, TABLE[1] + 14, TABLE[3] + 14, 0), 0.55, 9)
     cv.set_cam(tab_cam(cam))
+    cv.ink_override = SOFTLINE
     for ch, p, F in ((WOMAN, pw, Fw), (MAN, pm, Fm)):
         k = ch.name
         cv.shade_dir = (-ch.dir, 0.5)
@@ -625,8 +652,10 @@ def draw_restaurant(cv, t, i, cam):
         draw_torso(cv, ch, p, F, k)
         draw_head(cv, ch, p, F, k)
     cv.set_cam(cam)
+    cv.ink_override = None
     draw_iso_table(cv)
     cv.set_cam(tab_cam(cam))
+    cv.ink_override = SOFTLINE
     cv.shade_dir = (0, 1)
     vase(cv, "vs")
     fh = candle(cv, i, "cd")
@@ -673,6 +702,7 @@ def draw_restaurant(cv, t, i, cam):
     if pm.phone:
         cv.light((pm.handB[0] - 30, pm.handB[1] - 120), 130, (0.7, 0.85, 1.0), 0.28)
     # lamp light cone (world)
+    cv.ink_override = None
     cv.set_cam(cam)
     lx, ly = iso.P(390, 390, iso.LAMP_Z)
     cone = np.array([(lx - 52, ly + 4), (lx + 52, ly + 4), (lx + 175, 1150), (lx - 175, 1150)], float)
@@ -681,6 +711,26 @@ def draw_restaurant(cv, t, i, cam):
 
 # ---------------------------------------------------------------- phone close-up
 PC = np.array([540.0, 880.0])
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load_logo():
+    """AylluOS woven mark (assets/aylluos_mark.svg): its polygons plus the orange seed."""
+    txt = open(os.path.join(_HERE, "assets", "aylluos_mark.svg")).read()
+    out = []
+    for pts, fill in re.findall(r'<polygon points="([^"]+)" fill="(#[0-9A-Fa-f]{6})"', txt):
+        poly = [tuple(map(float, q.split(","))) for q in pts.split()]
+        col = tuple(int(fill[i:i + 2], 16) / 255 for i in (1, 3, 5))
+        out.append((poly, col))
+    seed = spline([(50, 40.2), (55.6, 47), (55.6, 53.85), (50, 59.45), (44.4, 53.85), (44.4, 47)], True, 6)
+    out.append((seed.tolist(), (0xF4 / 255, 0x77 / 255, 0x21 / 255)))
+    return out
+
+
+LOGO = _load_logo()
+_baby = Image.open(os.path.join(_HERE, "assets", "baby_sleeping.webp")).convert("RGBA")
+_bw, _bh = _baby.size
+BABY_IMG = np.asarray(_baby.crop((0, int(_bh * 0.08), _bw, int(_bh * 0.08 + _bw * 170 / 380))))
 
 
 def closeup_light(x, y):
@@ -766,18 +816,22 @@ def draw_closeup(cv, t, i):
     if dt >= 0.1:
         u = dt - 0.1
         sc = 0.82 if u < 0.08 else (1.05 if u < 0.17 else 1.0)
-        cc = np.array([0, -32])
+        cc = np.array([0, 58])
         S = lambda pts: T((np.asarray(pts, float) - cc) * sc + cc)
-        card = S(rrect(-214, -150, 214, 86, 36))
+        card = S(rrect(-214, -150, 214, 266, 36))
         cv.paint(card, (0.97, 0.96, 0.93), 0.94)
         cv.ink([(card, True, 3.0)], key=k + "card")
         icon = S(rrect(-190, -128, -124, -62, 17))
-        cv.fill(icon, (0.96, 0.52, 0.32), dens=0.9, color2=(0.92, 0.38, 0.42), key=k + "icon", anchor=c, soft=1.2)
-        cv.ink([(icon, True, 2.4)], key=k + "icon")
+        cv.paint(icon, (0.94, 0.93, 1.0))
+        for poly, col in LOGO:
+            cv.paint(S(np.array([(-190 + x * 0.66, -128 + y * 0.66) for x, y in poly])), col)
+        cv.ink([(icon, True, 1.6)], key=k + "icon", alpha=0.5)
+        bo, bu, bv = S([(-190, 74)])[0], S([(190, 74)])[0] - S([(-190, 74)])[0], S([(-190, 244)])[0] - S([(-190, 74)])[0]
+        cv.image(BABY_IMG, bo, bu, bv, clip=[S(rrect(-190, 74, 190, 244, 20))])
+        cv.ink([(S(rrect(-190, 74, 190, 244, 20)), True, 1.4)], key=k + "img", alpha=0.35)
         def ctxt(s, x, y, size, col, bold=False, align="left", fam="Inter"):
             p = S([(x, y)])[0]
             cv.text(s, p[0], p[1], size * sc, col, bold=bold, align=align, family=fam, rot=rot, jitter=0.35)
-        ctxt("A", -157, -78, 40, (1, 1, 1), bold=True, align="center")
         ctxt("AylluOS", -106, -84, 29, (0.25, 0.22, 0.24), bold=True)
         ctxt("now", 192, -84, 25, (0.45, 0.43, 0.46), align="right")
         ctxt("Baby is Sleeping", -190, -4, 42, (0.12, 0.10, 0.12), bold=True)
@@ -786,10 +840,10 @@ def draw_closeup(cv, t, i):
     cv.pstroke(T(spline([(-236, -380), (-240, -200), (-238, 0)])), 5, (0.55, 0.55, 0.65), 0.6, key=k + "rim")
     # thumbs in front
     for s in (-1, 1):
-        th = T(spline([(s * 262, 400), (s * 226, 320), (s * 178, 262), (s * 150, 250), (s * 140, 272), (s * 166, 322),
-                       (s * 196, 380), (s * 222, 440)], True))
+        th = T(spline([(s * 262, 460), (s * 226, 380), (s * 178, 322), (s * 150, 310), (s * 140, 332), (s * 166, 382),
+                       (s * 196, 440), (s * 222, 500)], True))
         cv.fill(th, SKIN_M, dens=0.6, color2=SKIN_M2, key=k + f"th{s}", anchor=c)
-        nail = T(ellipse(s * 158, 268, 12, 16, rot=-s * 0.7))
+        nail = T(ellipse(s * 158, 328, 12, 16, rot=-s * 0.7))
         cv.fill(nail, (0.98, 0.85, 0.78), dens=0.4, key=k + f"nl{s}", anchor=c, soft=1)
         cv.ink([(th, True, 3.8), (nail, True, 2.0)], key=k + f"th{s}")
     cv.light(tuple(c + (0, -60)), 420, (0.65, 0.7, 1.0), 0.18)

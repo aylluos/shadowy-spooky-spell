@@ -1,6 +1,6 @@
 # Date Night: AylluOS (15 s Reel)
 
-An isometric, hand-drawn ink + gouache animation made entirely in code (pen hatching, painted textures, lamp-lit scene, drawings on twos).
+An isometric, hand-drawn animation made entirely in code: ink + gouache diorama, characters in the AylluOS baby illustration style, drawings on twos.
 
 - Output: `output/date_night_aylluos_1080x1920.mp4` (1080x1920, 9:16, H.264, 24 fps, 15 s)
 - 180 unique drawings, each held for 2 frames ("on twos": 12 drawings/s at 24 fps)

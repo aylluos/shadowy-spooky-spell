@@ -258,6 +258,7 @@ class Canvas:
         self.cx, self.cy, self.z = cam
         self.base_cam = cam
         self.boil = boil
+        self.ink_override = None  # (color, alpha_k, width_k) for soft character lines
         self.lightfn = None       # f(world_x, world_y) -> (h, w, 3) multiplier (base-camera world coords)
 
     @property
@@ -388,9 +389,9 @@ class Canvas:
     shade_amt = 0.3
 
     def fill(self, polys, color, dens=None, color2=None, key="", anchor=(0, 0), clip=None, evenodd=False, **kw):
-        """character paint: opaque gouache lit by the scene lights"""
+        """character paint: smooth opaque paint lit by the scene lights"""
         self.gouache(polys, color, key=key, anchor=anchor, color2=color2, clip=clip, evenodd=evenodd,
-                     shade_dir=self.shade_dir, shade=self.shade_amt, tex=0.035)
+                     shade_dir=self.shade_dir, shade=self.shade_amt, tex=0.012, edge_dark=0.06, jit=0.6)
 
     # ---- watercolor glaze (transparent, multiplies)
     def wash(self, polys, color, dens=0.6, color2=None, edge=0.9, rough=1.0, soft=3.0,
@@ -448,6 +449,12 @@ class Canvas:
     def ink(self, strokes, width=2.4, color=INK, alpha=0.9, key="", jitter=0.9, boil=True, sketch=True,
             second=0.45, clip=None):
         """strokes: list of (pts, closed) or (pts, closed, width)."""
+        if self.ink_override is not None and color is INK:
+            color, k_a, k_w = self.ink_override
+            alpha *= k_a
+            width *= k_w
+            strokes = [(st[0], st[1], st[2] * k_w) if len(st) > 2 else st for st in strokes]
+            second = 0.0
         polys, polys2 = [], []
         z = self.z
         zj = min(z, 2.0)
@@ -616,6 +623,30 @@ class Canvas:
         gc = g[..., None] * np.asarray(color, np.float32)
         reg[:] = 1 - (1 - reg) * (1 - gc)
 
+    # ---- raster image placed on a world-space parallelogram (o = top-left, u = top edge, v = left edge)
+    def image(self, rgba, o, u, v, alpha=1.0, clip=None):
+        from PIL import Image as _I
+        o, u, v = np.asarray(o, float), np.asarray(u, float), np.asarray(v, float)
+        corners = self.S(np.array([o, o + u, o + v, o + u + v]))
+        bb = self._bbox([corners], 2)
+        if bb is None:
+            return
+        x0, y0, x1, y1 = bb
+        so, su, sv = corners[0], corners[1] - corners[0], corners[2] - corners[0]
+        h_, w_ = rgba.shape[:2]
+        A = np.array([[su[0] / w_, sv[0] / h_], [su[1] / w_, sv[1] / h_]])
+        Ai = np.linalg.inv(A)
+        c = -Ai @ (so - (x0, y0))
+        data = (Ai[0, 0], Ai[0, 1], c[0], Ai[1, 0], Ai[1, 1], c[1])
+        src = _I.fromarray(rgba)
+        out = np.asarray(src.transform((x1 - x0, y1 - y0), _I.AFFINE, data, resample=_I.BICUBIC), np.float32) / 255
+        a = out[..., 3:4] * alpha
+        if clip is not None:
+            a = a * self._mask([self.S(p) for p in clip], bb)[..., None]
+        reg = self.img[y0:y1, x0:x1]
+        reg *= (1 - a)
+        reg += out[..., :3] * a
+
     # ---- text
     def text(self, s, x, y, size, color, bold=False, family="Inter", align="left", alpha=1.0,
              rot=0.0, jitter=0.6):
@@ -670,5 +701,5 @@ def grade(img, grain, vignette=0.3, flicker=0.0, bloom=0.35, saturation=1.3):
     shadow_w = np.clip(1 - lum * 1.6, 0, 1)
     out = out + shadow_w * np.array([-0.012, 0.0, 0.035], np.float32)
     out *= _VIG[(h, w)][..., None] * (1 + flicker)
-    out *= (1 + 0.025 * grain[..., None])
+    out *= (1 + 0.012 * grain[..., None])
     return (np.clip(out, 0, 1) * 255 + 0.5).astype(np.uint8)
