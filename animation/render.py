@@ -19,6 +19,7 @@ import iso_scene as scene
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.environ.get("WC_CACHE", os.path.join(HERE, ".cache"))
 os.makedirs(CACHE, exist_ok=True)
+PAD = 100                      # world-px margin painted around the frame
 SB = 2.6                       # background painted at 2.6x so camera push-ins stay sharp
 
 _tex = None
@@ -34,9 +35,9 @@ def tex():
 
 def big_background():
     if "room" not in _bg:
-        path = os.path.join(CACHE, "room_bg_v1.png")
+        path = os.path.join(CACHE, "room_bg_v2.png")
         if not os.path.exists(path):
-            cv = Canvas(tex(), cam=(540, 960, SB), size=(int(W * SB), int(H * SB)))
+            cv = Canvas(tex(), cam=(540, 960, SB), size=(int((W + 2 * PAD) * SB), int((H + 2 * PAD) * SB)))
             cv.lightfn = iso_bg.make_light()
             iso_bg.draw_background(cv)
             Image.fromarray((np.clip(cv.img, 0, 1) * 255 + 0.5).astype(np.uint8)).save(path)
@@ -47,8 +48,8 @@ def big_background():
 
 def room_view(cam):
     cx, cy, z = cam
-    x0, y0 = (cx - W / 2 / z) * SB, (cy - H / 2 / z) * SB
-    x1, y1 = (cx + W / 2 / z) * SB, (cy + H / 2 / z) * SB
+    x0, y0 = (cx - W / 2 / z + PAD) * SB, (cy - H / 2 / z + PAD) * SB
+    x1, y1 = (cx + W / 2 / z + PAD) * SB, (cy + H / 2 / z + PAD) * SB
     im = big_background().resize((W, H), Image.LANCZOS, box=(x0, y0, x1, y1))
     return np.asarray(im, np.float32) / 255.0
 
@@ -75,7 +76,7 @@ def render(i):
         cv.lightfn = iso_bg.make_light(candle=1.0 + rng.uniform(-0.06, 0.06))
         scene.draw_restaurant(cv, t, i, cam)
     flick = np.random.default_rng(i).uniform(-0.008, 0.008)
-    return grade(cv.img, cv.grain, vignette=0.3, flicker=flick)
+    return grade(cv.img, cv.grain, vignette=0.18, flicker=flick)
 
 
 def main():

@@ -650,7 +650,7 @@ class Canvas:
 _VIG = {}
 
 
-def grade(img, grain, vignette=0.3, flicker=0.0, bloom=0.35):
+def grade(img, grain, vignette=0.3, flicker=0.0, bloom=0.35, saturation=1.3):
     """final look: bloom, colour grade (cool shadows, warm highlights), vignette, paper grain."""
     h, w, _ = img.shape
     if (h, w) not in _VIG:
@@ -666,6 +666,7 @@ def grade(img, grain, vignette=0.3, flicker=0.0, bloom=0.35):
         big = zoom(small, (6, 6, 1), order=1)[:h, :w]
         out = 1 - (1 - out) * (1 - bloom * big)
     lum = out.mean(2, keepdims=True)
+    out = np.clip(lum + (out - lum) * saturation, 0, 1)
     shadow_w = np.clip(1 - lum * 1.6, 0, 1)
     out = out + shadow_w * np.array([-0.012, 0.0, 0.035], np.float32)
     out *= _VIG[(h, w)][..., None] * (1 + flicker)

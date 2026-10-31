@@ -13,7 +13,14 @@ WALLT = 26.0                   # wall thickness
 SLAB = 56.0
 
 
+RS = 0.72                      # room scale about the table centre (keeps the whole diorama in frame)
+SCALE = [1.0]
+
+
 def P(x, y, z=0.0):
+    k = SCALE[0]
+    if k != 1.0:
+        x, y, z = 390 + (x - 390) * k, 390 + (y - 390) * k, z * k
     return (OX + (x - y) * C30, OY + (x + y) * S30 - z)
 
 
@@ -33,12 +40,24 @@ INKC = (0.13, 0.09, 0.08)
 
 # ---------------------------------------------------------------- lighting
 LAMP_POOL = (540.0, 1095.0)
+LAMP_Z = 520.0
+
+
+def _scaled(x, y, z):
+    SCALE[0] = RS
+    p = P(x, y, z)
+    SCALE[0] = 1.0
+    return p
+
+
+WINC = _scaled(420, 0, 380)
+SCONCE = _scaled(0, 600, 430)
 
 
 def make_light(candle=1.0, phone=0.0, phone_pos=(621, 1136)):
     def f(x, y):
         out = np.empty(np.broadcast(x, y).shape + (3,), np.float32)
-        amb = np.array([0.50, 0.43, 0.50], np.float32)
+        amb = np.array([0.60, 0.52, 0.56], np.float32)
         out[:] = amb
         d = ((x - LAMP_POOL[0]) / 330.0) ** 2 + ((y - LAMP_POOL[1]) / 260.0) ** 2
         g = np.exp(-d * 1.4)
@@ -46,10 +65,10 @@ def make_light(candle=1.0, phone=0.0, phone_pos=(621, 1136)):
         d2 = ((x - 540) / 170.0) ** 2 + ((y - 820) / 150.0) ** 2
         out += np.exp(-d2)[..., None] * np.array([0.35, 0.25, 0.12], np.float32)
         # cool window light on the right wall
-        d3 = ((x - 760) / 220.0) ** 2 + ((y - 560) / 260.0) ** 2
+        d3 = ((x - WINC[0]) / 200.0) ** 2 + ((y - WINC[1]) / 230.0) ** 2
         out += np.exp(-d3)[..., None] * np.array([0.05, 0.10, 0.20], np.float32)
         # sconce on left wall
-        d4 = ((x - 175) / 160.0) ** 2 + ((y - 640) / 170.0) ** 2
+        d4 = ((x - SCONCE[0]) / 140.0) ** 2 + ((y - SCONCE[1]) / 150.0) ** 2
         out += np.exp(-d4)[..., None] * np.array([0.40, 0.28, 0.14], np.float32)
         if phone > 0:
             d5 = ((x - phone_pos[0]) / 90.0) ** 2 + ((y - phone_pos[1]) / 70.0) ** 2
@@ -95,6 +114,14 @@ def bottle(cv, x, y, z, h, r, col, key):
 
 # ---------------------------------------------------------------- background
 def draw_background(cv):
+    SCALE[0] = RS
+    try:
+        _draw_background(cv)
+    finally:
+        SCALE[0] = 1.0
+
+
+def _draw_background(cv):
     k = "bg"
     # night void behind the diorama
     sky = rrect(-300, -300, 1400, 2300, 10)
@@ -281,7 +308,7 @@ def draw_background(cv):
     cv.gouache(hill, (0.42, 0.55, 0.36), key=k + "phl", boil=False)
     cv.ink([(pic, True, 1.4), (inner, True, 1.0)], key=k + "pic", boil=False)
     # sconce
-    sx_, sy_ = P(0, 720, 430)
+    sx_, sy_ = P(0, 600, 430)
     sc = spline([(sx_ - 16, sy_ - 10), (sx_ + 16, sy_ - 1), (sx_ + 12, sy_ + 22), (sx_ - 12, sy_ + 14)], True)
     cv.paint(sc, (1.0, 0.85, 0.55))
     cv.ink([(sc, True, 1.3)], key=k + "sc", boil=False)
@@ -331,22 +358,22 @@ def draw_background(cv):
     cv.shadow(PA([(0, 0, 0), (L, 0, 0), (L, 50, 0), (0, 50, 0)]), 0.45, 10)
     cv.shadow(PA([(0, 0, 0), (0, L, 0), (50, L, 0), (50, 0, 0)]), 0.45, 10)
     # rug
-    rug = circ3(390, 390, 205, 0.5, 60)
+    rug = circ3(390, 390, 280, 0.5, 60)
     cv.gouache(rug, (0.46, 0.18, 0.18), color2=(0.40, 0.16, 0.22), key=k + "rug", tex=0.14, boil=False)
-    border = circ3(390, 390, 180, 0.5, 60)
-    cv.ink([(rug, True, 1.4), (border, True, 1.0), (circ3(390, 390, 170, 0.5, 60), True, 0.8)],
+    border = circ3(390, 390, 252, 0.5, 60)
+    cv.ink([(rug, True, 1.4), (border, True, 1.0), (circ3(390, 390, 240, 0.5, 60), True, 0.8)],
            key=k + "rug", boil=False)
     for j in range(24):
         a = j / 24 * 2 * math.pi
-        p0 = P(390 + 175 * math.cos(a), 390 + 175 * math.sin(a), 0.5)
+        p0 = P(390 + 246 * math.cos(a), 390 + 246 * math.sin(a), 0.5)
         cv.paint(ellipse(p0[0], p0[1], 3.2, 1.8, n=8), (0.85, 0.65, 0.3), 0.9, light=True)
 
     # ---- empty table for two in the back right
-    side_table(cv, 600, 170, k + "t2")
-    side_table(cv, 150, 600, k + "t3")
 
     # ---- pendant lamp + string lights
-    lx, ly = P(390, 390, 440)
+    SCALE[0] = 1.0
+    lx, ly = P(390, 390, LAMP_Z)
+    SCALE[0] = RS
     cv.ink([([(lx, -50), (lx, ly - 48)], False, 1.4)], key=k + "cord", boil=False, sketch=False)
     shade_p = spline([(lx - 62, ly), (lx - 50, ly - 26), (lx - 18, ly - 46), (lx, ly - 48), (lx + 18, ly - 46),
                       (lx + 50, ly - 26), (lx + 62, ly)], n=6)
@@ -369,7 +396,7 @@ def draw_background(cv):
             cv.light((q[0], q[1] + 7), 22, (1.0, 0.75, 0.4), 0.5)
     # baked glows
     cv.light((lx, ly + 4), 95, (1.0, 0.78, 0.45), 0.5)
-    cv.light(P(0, 720, 430), 60, (1.0, 0.75, 0.4), 0.55)
+    cv.light(P(0, 600, 430), 60, (1.0, 0.75, 0.4), 0.55)
 
 
 def side_table(cv, x, y, k):

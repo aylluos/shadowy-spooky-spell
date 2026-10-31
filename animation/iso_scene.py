@@ -16,20 +16,13 @@ SHOTS = [(0, "wide"), (51, "tight"), (69, "wide"), (86, "phone"), (128, "tight")
 
 
 def cam_for(i):
-    """world camera (cx, cy, zoom) for drawing i"""
+    """world camera (cx, cy, zoom): the whole isometric diorama stays in frame; only gentle push-ins."""
     t = i / FPS_DRAW
-    kind = shot_for(i)
-    if kind == "phone":
+    if shot_for(i) == "phone":
         return (540.0, 960.0, 1.0)
-    if t < 4.25:
-        return (540.0, key(t, [(0, 960.0), (0.9, 960.0), (3.2, 995.0)]), key(t, [(0, 1.0), (0.9, 1.0), (3.2, 1.7)]))
-    if t < 5.75:
-        return (540.0, 955.0, key(t, [(4.25, 2.4), (5.75, 2.55)]))
-    if t < 7.17:
-        return (540.0, 995.0, 1.8)
-    if t < 12.0:
-        return (540.0, 955.0, key(t, [(10.67, 2.5), (12.0, 2.4)]))
-    return (540.0, key(t, [(12, 995.0), (13.4, 995.0), (15, 962.0)]), key(t, [(12, 1.8), (13.4, 1.8), (15, 1.04)]))
+    z = key(t, [(0, 1.0), (3.3, 1.04), (4.25, 1.08), (5.75, 1.08), (7.17, 1.06), (10.67, 1.08), (12.0, 1.08),
+                (13.4, 1.06), (15.0, 1.0)])
+    return (540.0, 985.0, z)
 
 
 def shot_for(i):
@@ -574,7 +567,7 @@ def heart(cv, c, s, k):
 
 
 # ---------------------------------------------------------------- sets
-TAB_S, TAB_O = 0.4, (324.0, 555.0)
+TAB_S, TAB_O = 0.48, (540 - 0.48 * 540, 1115 - 0.48 * 1400)
 
 
 def tab_cam(cam):
@@ -586,7 +579,7 @@ def tab2world(p):
     return (p[0] * TAB_S + TAB_O[0], p[1] * TAB_S + TAB_O[1])
 
 
-TABLE = (390.0, 390.0, 95.0, 108.0)   # iso x, y, top height, radius
+TABLE = (390.0, 390.0, 95.0, 130.0)   # iso x, y, top height, radius
 CLOTH, CLOTH2 = (0.94, 0.90, 0.83), (0.90, 0.86, 0.84)
 
 
@@ -620,7 +613,7 @@ def draw_restaurant(cv, t, i, cam):
     pw, pm = pose_w(t), pose_m(t)
     Fw, Fm = WOMAN.frame(pw), MAN.frame(pm)
     cv.set_cam(cam)
-    for (x, y, f) in ((329, 451, (0.707, -0.707)), (451, 329, (-0.707, 0.707))):
+    for (x, y, f) in ((317, 463, (0.707, -0.707)), (463, 317, (-0.707, 0.707))):
         cv.shadow(iso.circ3(x - 6, y + 6, 46, 0), 0.5, 6)
         iso.chair_iso(cv, x, y, f"ch{x}", facing=f, col=(0.36, 0.21, 0.13))
     cv.shadow(iso.circ3(TABLE[0] + 14, TABLE[1] + 14, TABLE[3] + 14, 0), 0.55, 9)
@@ -681,7 +674,7 @@ def draw_restaurant(cv, t, i, cam):
         cv.light((pm.handB[0] - 30, pm.handB[1] - 120), 130, (0.7, 0.85, 1.0), 0.28)
     # lamp light cone (world)
     cv.set_cam(cam)
-    lx, ly = iso.P(390, 390, 440)
+    lx, ly = iso.P(390, 390, iso.LAMP_Z)
     cone = np.array([(lx - 52, ly + 4), (lx + 52, ly + 4), (lx + 175, 1150), (lx - 175, 1150)], float)
     cv.glow_poly(cone, (1.0, 0.82, 0.5), 0.13, soft=22)
 
