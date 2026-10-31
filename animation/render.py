@@ -1,8 +1,8 @@
-"""Render the date-night animation.
+"""Render the isometric date-night animation.
 
     python3 render.py preview 0 40 90 150     # PNG stills of selected drawings
-    python3 render.py sheet                   # contact sheet of every 6th drawing
-    python3 render.py video out.mp4           # full 15 s MP4, 1080x1920, 24 fps (drawings on twos)
+    python3 render.py sheet [step]            # contact sheet
+    python3 render.py video out.mp4           # 15 s MP4, 1080x1920, 24 fps (drawings on twos)
 """
 import os
 import subprocess
@@ -12,12 +12,14 @@ from multiprocessing import Pool
 import numpy as np
 from PIL import Image
 
-from wc import Canvas, Textures, W, H
-import scene
+from wc import Canvas, Textures, W, H, grade
+import iso_bg
+import iso_scene as scene
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.environ.get("WC_CACHE", os.path.join(HERE, ".cache"))
 os.makedirs(CACHE, exist_ok=True)
+SB = 2.6                       # background painted at 2.6x so camera push-ins stay sharp
 
 _tex = None
 _bg = {}
@@ -30,32 +32,56 @@ def tex():
     return _tex
 
 
-def background(kind):
-    if kind not in _bg:
-        cv = Canvas(tex(), cam=scene.CAMS[kind], boil=0)
-        if kind == "phone":
-            scene.draw_closeup_bg(cv)
-        else:
-            scene.draw_restaurant_bg(cv)
-        _bg[kind] = cv.img.copy()
-    return _bg[kind]
+def big_background():
+    if "room" not in _bg:
+        path = os.path.join(CACHE, "room_bg_v1.png")
+        if not os.path.exists(path):
+            cv = Canvas(tex(), cam=(540, 960, SB), size=(int(W * SB), int(H * SB)))
+            cv.lightfn = iso_bg.make_light()
+            iso_bg.draw_background(cv)
+            Image.fromarray((np.clip(cv.img, 0, 1) * 255 + 0.5).astype(np.uint8)).save(path)
+        _bg["room"] = Image.open(path).convert("RGB")
+        _bg["room"].load()
+    return _bg["room"]
+
+
+def room_view(cam):
+    cx, cy, z = cam
+    x0, y0 = (cx - W / 2 / z) * SB, (cy - H / 2 / z) * SB
+    x1, y1 = (cx + W / 2 / z) * SB, (cy + H / 2 / z) * SB
+    im = big_background().resize((W, H), Image.LANCZOS, box=(x0, y0, x1, y1))
+    return np.asarray(im, np.float32) / 255.0
+
+
+def closeup_bg():
+    if "phone" not in _bg:
+        cv = Canvas(tex(), cam=(540, 960, 1.0), boil=0)
+        scene.draw_closeup_bg(cv)
+        _bg["phone"] = cv.img.copy()
+    return _bg["phone"]
 
 
 def render(i):
     kind = scene.shot_for(i)
     t = i / scene.FPS_DRAW
-    cv = Canvas(tex(), cam=scene.CAMS[kind], boil=i, base=background(kind))
+    cam = scene.cam_for(i)
     if kind == "phone":
+        cv = Canvas(tex(), cam=cam, boil=i, base=closeup_bg())
+        cv.lightfn = scene.closeup_light
         scene.draw_closeup(cv, t, i)
     else:
-        scene.draw_restaurant(cv, t, i)
+        cv = Canvas(tex(), cam=cam, boil=i, base=room_view(cam))
+        rng = np.random.default_rng(i)
+        cv.lightfn = iso_bg.make_light(candle=1.0 + rng.uniform(-0.06, 0.06))
+        scene.draw_restaurant(cv, t, i, cam)
     flick = np.random.default_rng(i).uniform(-0.008, 0.008)
-    return cv.finish(vignette=0.24, flicker=flick)
+    return grade(cv.img, cv.grain, vignette=0.3, flicker=flick)
 
 
 def main():
     mode = sys.argv[1]
     out_dir = os.environ.get("OUT", HERE)
+    big_background()
     if mode == "preview":
         for a in sys.argv[2:]:
             Image.fromarray(render(int(a))).save(os.path.join(out_dir, f"d{int(a):03d}.png"))
