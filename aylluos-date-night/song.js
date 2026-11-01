@@ -11,7 +11,7 @@ const N = Math.ceil(DURATION * SR);
 const bus = () => new Bus(N);
 const drums = bus(), bass = bus(), pad = bus(), keys = bus(), lead = bus(), fx = bus(), amb = bus();
 const verb = bus(), dly = bus();
-const groove = (t) => t < ev.stop || t >= ev.clink; // the band plays only while all is well
+const groove = (t) => t < ev.stop - BEAT / 2 || t >= ev.clink; // the band plays only while all is well (an 8th of held breath before the buzz)
 
 // ---------- restaurant room tone: soft murmur bed, a cutlery clink now and then ----------
 {
@@ -55,7 +55,7 @@ function buzz(len = 0.42) {
 }
 for (const [i, t] of ev.buzz.entries()) { fx.addMono(buzz(), t, i === 0 ? 0.42 : 0.36, 0.1); fx.addMono(I.thud(120, 0.03), t, 0.25); }
 // the record stops: a tiny vinyl brake on the first buzz
-fx.addMono(I.noiseSweep(0.18, 2200, 300, { q: 1.2, pink: true }), ev.stop - 0.05, 0.08);
+fx.addMono(I.noiseSweep(0.18, 2200, 300, { q: 1.2, pink: true }), ev.stop + 0.02, 0.06);
 
 // ---------- tension: a dark low pad and a heartbeat until the notification ----------
 for (const c of sc.chords.filter((c) => c.t0 >= ev.worried && c.t0 < ev.relief)) {
@@ -76,6 +76,7 @@ for (const c of sc.chords.filter((c) => c.t0 >= ev.relief && c.t0 < ev.clink)) {
   }
 }
 keys.addMono(I.epiano(m('F2'), 1.6, { index: 0.5 }), ev.relief, 0.22);
+fx.addMono(I.thud(95, 0.06), ev.relief, 0.5); fx.addMono(I.bell(1760, 0.5, 0.8, 2.0), ev.relief, 0.12); // a soft felt hit marks the relief
 fx.addMono(I.noiseSweep(BEAT * 0.9, 300, 5000, { q: 0.8, shape: (x) => x * x, pink: true }), ev.clink - BEAT, 0.12); // the glasses rise
 
 // ---------- the clink: two wine glasses (two detuned glass partials), then the groove again ----------

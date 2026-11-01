@@ -410,8 +410,9 @@
     ctx.globalAlpha = 1;
     UI.text(ctx, 'Saturday, October 31', w / 2, 112, { size: 19, weight: 700, color: '#FFFFFF', align: 'center' });
     UI.text(ctx, '8:31', w / 2, 210, { size: 96, weight: 700, color: '#FFFFFF', align: 'center', spacing: -2 });
-    const p = UI.pop(t, ev.notif, 0.32, 1.8);
-    if (p <= 0) return;
+    const q = qt(t);
+    if (q < ev.notif) return;
+    const p = 0.92 + 0.08 * ease.outBack(clamp((q - ev.notif) / 0.25), 2); // lands at full size on its first drawing
     ctx.save(); ctx.translate(w / 2, 300); ctx.scale(p, p); ctx.translate(-w / 2, -300);
     UI.card(ctx, 14, 246, w - 28, 330, 26, { fill: 'rgba(246,244,255,0.94)' });
     ctx.fillStyle = B.soft; ctx.beginPath(); ctx.roundRect(30, 262, 46, 46, 11); ctx.fill();
@@ -454,6 +455,7 @@
       ctx.strokeStyle = 'rgba(150,90,70,0.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(bx - s * 82, by - 150, 12, 16, s * 0.55, 0, 7); ctx.stroke();
     }
     glow(ctx, cx, cy - 100, 520, 'rgba(160,150,255,0.18)');
+    if (q >= ev.notif && q < ev.notif + 1 / 12) glow(ctx, cx, cy - 230, 420, 'rgba(235,230,255,0.55)'); // the screen flares as it lands
     const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.75);
     v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(20,10,30,0.5)');
     ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
